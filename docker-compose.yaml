@@ -39,6 +39,8 @@ services:
     restart: unless-stopped
     ports:
       - 11438:80
+    environment:
+      BACKEND_URL: ${BACKEND_URL:-http://translate-backend:8080}
     networks:
       - translate-network
     depends_on:
