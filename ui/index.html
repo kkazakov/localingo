@@ -615,13 +615,13 @@
     <span class="status-dot" id="status-dot"></span>
     <span id="status-text">Connecting…</span>
   </div>
-  <div>Localingo 12B · llamacpp</div>
+  <div id="model-name">Loading…</div>
 </div>
 
 <script>
   const API_KEY = '2f8d430a0f17b3eaa957cf7ae188a3db71a2df6d30cf0a9766eddbb0b70421c8';
   const API_URL = '/api/v1/chat/completions';
-  const MODEL   = 'translategemma-12b-Q8';
+  let MODEL = '';
 
   // --- Elements ---
   const inputText   = document.getElementById('input-text');
@@ -644,9 +644,11 @@
   const uploadIcon  = document.getElementById('upload-icon');
   const statusDot   = document.getElementById('status-dot');
   const statusText  = document.getElementById('status-text');
+  const modelNameDisplay = document.getElementById('model-name');
 
   let mode = 'text'; // 'text' | 'image'
   let imageDataUrl = null;
+  let loadedModel = null;
 
   // --- Status check ---
   async function checkStatus() {
@@ -655,17 +657,22 @@
         headers: { Authorization: `Bearer ${API_KEY}` }
       });
       const data = await r.json();
-      const loaded = data.data?.some(m => m.id === MODEL);
-      if (loaded) {
+      const model = data.data?.[0];
+      if (model) {
+        MODEL = model.id;
+        loadedModel = model.id;
+        modelNameDisplay.textContent = model.id;
         statusDot.className = 'status-dot ok';
         statusText.textContent = 'Model ready';
       } else {
         statusDot.className = 'status-dot';
-        statusText.textContent = 'Model not loaded yet — start llamacpp first';
+        statusText.textContent = 'Model not loaded yet';
+        modelNameDisplay.textContent = 'No model';
       }
     } catch {
       statusDot.className = 'status-dot error';
-      statusText.textContent = 'Cannot reach llamacpp';
+      statusText.textContent = 'Cannot reach backend';
+      modelNameDisplay.textContent = 'Error';
     }
   }
   checkStatus();
@@ -801,13 +808,19 @@
   }
 
   async function translate(content) {
+    if (!MODEL) {
+      outputText.classList.remove('placeholder');
+      outputText.classList.add('error');
+      outputText.textContent = 'Error: Model not loaded. Please wait for the model to be ready.';
+      return;
+    }
+
     setLoading(true);
     setOutputPlaceholder();
     timing.textContent = '';
     outCharCount.textContent = '';
     const t0 = Date.now();
 
-    // Build the TranslateGemma-specific message format
     const messages = [{ role: 'user', content: [content] }];
 
     try {

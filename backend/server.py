@@ -194,7 +194,7 @@ def build_gguf_prompt(messages: list[Message]) -> str:
     elif msg.content and msg.content[0]:
       item = msg.content[0]
       if item.type == "text" and item.text:
-        text = f"{item.source_lang_code} -> {item.target_lang_code}: {item.text}"
+        text = f"You are a professional {item.source_lang_code} to {item.target_lang_code} translator. Your goal is to accurately convey the meaning and nuances of the original text while adhering to the target language's grammar, vocabulary, and cultural sensitivities.\nProduce only the {item.target_lang_code} translation, without any additional explanations or commentary. Please translate the following {item.source_lang_code} text into {item.target_lang_code}:\n\n\n{item.text}"
       elif item.type == "image":
         text = "<image>"
       else:
@@ -203,11 +203,11 @@ def build_gguf_prompt(messages: list[Message]) -> str:
       text = ""
     
     if msg.role == "user":
-      prompt += f"User: {text}\n"
+      prompt += f"<start_of_turn>user\n{text}<end_of_turn>\n"
     elif msg.role == "assistant":
-      prompt += f"Assistant: {text}\n"
+      prompt += f"<start_of_turn>model\n{text}<end_of_turn>\n"
   
-  prompt += "Assistant:"
+  prompt += "<start_of_turn>model\n"
   return prompt
 
 
@@ -249,11 +249,12 @@ async def chat_completions(request: Request, body: ChatRequest):
       max_tokens=body.max_tokens,
       temperature=body.temperature if body.temperature > 0 else 0.1,
       top_p=0.95,
-      stop=["User:", "Assistant:"],
+      stop=["<end_of_turn>"],
     )
     elapsed = time.time() - t0
     
     result = output["choices"][0]["text"].strip()
+    
     prompt_tokens = output["usage"]["prompt_tokens"]
     completion_tokens = output["usage"]["completion_tokens"]
   else:
