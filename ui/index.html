@@ -89,7 +89,7 @@
           <option value="cs">Czech</option>
           <option value="da">Danish</option>
           <option value="nl">Dutch</option>
-          <option value="en">English</option>
+          <option value="en" selected>English</option>
           <option value="et">Estonian</option>
           <option value="fi">Finnish</option>
           <option value="fr">French</option>
@@ -342,10 +342,8 @@
   };
 
   function loadLanguages() {
-    const savedSrc = localStorage.getItem('srcLang');
-    const savedTgt = localStorage.getItem('tgtLang');
-    if (savedSrc) srcLang.value = savedSrc;
-    if (savedTgt) tgtLang.value = savedTgt;
+    srcLang.value = localStorage.getItem('srcLang') ?? 'en';
+    tgtLang.value = localStorage.getItem('tgtLang') ?? 'en';
   }
 
   function saveLanguages() {
