@@ -1,4 +1,4 @@
-# translate
+# Localingo
 
 A self-hosted AI translation service powered by Google's TranslateGemma 12B multimodal model. Translates text and images between 55 languages through a clean web UI and an OpenAI-compatible REST API.
 
