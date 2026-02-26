@@ -1,0 +1,49 @@
+services:
+  translate-backend:
+    build:
+      context: ./backend
+    image: translate-backend:latest
+    container_name: translate-backend
+    restart: unless-stopped
+    ports:
+      - 12434:8080
+    volumes:
+      - /storage-models:/models
+    environment:
+      MODEL_ID: google/translategemma-12b-it
+      MODEL_ALIAS: translategemma-12b-Q8
+      API_KEY: 2f8d430a0f17b3eaa957cf7ae188a3db71a2df6d30cf0a9766eddbb0b70421c8
+      HF_HOME: /models/hf_cache
+      HF_TOKEN: ${HF_TOKEN}
+    networks:
+      - translate-network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  translate-ui:
+    build:
+      context: ./ui
+    image: translate-ui:latest
+    container_name: translate-ui
+    restart: unless-stopped
+    ports:
+      - 11438:80
+    networks:
+      - translate-network
+    depends_on:
+      - translate-backend
+
+networks:
+  translate-network:
+    driver: bridge
