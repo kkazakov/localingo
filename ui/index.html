@@ -455,10 +455,20 @@
 
   copyBtn.addEventListener('click', async () => {
     if (outputText.classList.contains('placeholder')) return;
-    await navigator.clipboard.writeText(outputText.textContent);
-    const origText = copyBtn.textContent;
-    copyBtn.textContent = 'Copied!';
-    setTimeout(() => copyBtn.textContent = origText, 1200);
+    const text = outputText.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    copyBtn.textContent = '✓ Copied';
+    setTimeout(() => copyBtn.textContent = 'Copy', 1000);
   });
 
   dropZone.addEventListener('click', () => fileInput.click());
