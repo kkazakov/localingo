@@ -16,8 +16,26 @@ add_model() {
   fi
   
   local display_name="$model_alias ($vram_req)"
-  MODEL_MAP["$display_name"]="$model_id|$model_alias"
+  MODEL_MAP["$display_name"]="$model_id|$model_alias|$model_repo|$quant_file"
   MODEL_LIST+=("$display_name")
+}
+
+is_downloaded() {
+  local model_repo="$1"
+  local quant_file="$2"
+  local storage_root="$LOCAL_STORAGE"
+  if [[ "$storage_root" != /* ]]; then
+    storage_root="$(dirname "$ENV_FILE")/$storage_root"
+  fi
+  local cache_dir="$storage_root/hf_cache/hub/models--$(echo "$model_repo" | sed 's|/|--|g')"
+  if [ ! -d "$cache_dir/snapshots" ]; then
+    return 1
+  fi
+  if [ -n "$quant_file" ]; then
+    find "$cache_dir/snapshots" -maxdepth 2 -name "$quant_file" | grep -q .
+  else
+    find "$cache_dir/snapshots" -maxdepth 2 -name "*.safetensors" | grep -q .
+  fi
 }
 
 add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q2_K" "2.5 GB VRAM" "translategemma-4b-it.Q2_K.gguf"
@@ -77,13 +95,20 @@ for i in $(seq 0 $((${#MODEL_LIST[@]} - 1))); do
   selection="${MODEL_MAP[$display_name]}"
   model_id=$(echo "$selection" | cut -d'|' -f1)
   model_alias=$(echo "$selection" | cut -d'|' -f2)
+  model_repo=$(echo "$selection" | cut -d'|' -f3)
+  quant_file=$(echo "$selection" | cut -d'|' -f4)
   
   marker=""
   if [ "$model_id" = "$CURRENT_MODEL_ID" ] && [ "$model_alias" = "$CURRENT_MODEL_ALIAS" ]; then
     marker=" *"
   fi
   
-  printf "  [%d] %s%s\n" $((i + 1)) "$display_name" "$marker"
+  dl_marker=""
+  if is_downloaded "$model_repo" "$quant_file"; then
+    dl_marker=" [downloaded]"
+  fi
+  
+  printf "  [%d] %s%s%s\n" $((i + 1)) "$display_name" "$dl_marker" "$marker"
 done
 
 echo ""
