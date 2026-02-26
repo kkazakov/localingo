@@ -12,7 +12,7 @@ services:
     environment:
       MODEL_ID: ${MODEL_ID:-google/translategemma-12b-it}
       MODEL_ALIAS: ${MODEL_ALIAS:-translategemma-12b-it}
-      API_KEY: 2f8d430a0f17b3eaa957cf7ae188a3db71a2df6d30cf0a9766eddbb0b70421c8
+      API_KEY: ${API_KEY:-2f8d430a0f17b3eaa957cf7ae188a3db71a2df6d30cf0a9766eddbb0b70421c8}
       HF_HOME: /models/hf_cache
       HF_TOKEN: ${HF_TOKEN}
     networks:
@@ -41,6 +41,7 @@ services:
       - 11438:80
     environment:
       BACKEND_URL: ${BACKEND_URL:-http://translate-backend:8080}
+      API_KEY: ${API_KEY:-2f8d430a0f17b3eaa957cf7ae188a3db71a2df6d30cf0a9766eddbb0b70421c8}
     networks:
       - translate-network
     depends_on:
