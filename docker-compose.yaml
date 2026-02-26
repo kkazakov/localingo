@@ -8,7 +8,7 @@ services:
     ports:
       - 12434:8080
     volumes:
-      - /storage-models:/models
+      - ${LOCAL_STORAGE}:/models
     environment:
       MODEL_ID: ${MODEL_ID:-google/translategemma-12b-it}
       MODEL_ALIAS: ${MODEL_ALIAS:-translategemma-12b-it}

@@ -66,12 +66,24 @@ if [ -t 0 ]; then
   stty sane 2>/dev/null || true
 fi
 
+CURRENT_MODEL_ID="${MODEL_ID:-}"
+CURRENT_MODEL_ALIAS="${MODEL_ALIAS:-}"
+
 echo "Select a TranslateGemma model:"
 echo ""
 
 for i in $(seq 0 $((${#MODEL_LIST[@]} - 1))); do
   display_name="${MODEL_LIST[$i]}"
-  printf "  [%d] %s\n" $((i + 1)) "$display_name"
+  selection="${MODEL_MAP[$display_name]}"
+  model_id=$(echo "$selection" | cut -d'|' -f1)
+  model_alias=$(echo "$selection" | cut -d'|' -f2)
+  
+  marker=""
+  if [ "$model_id" = "$CURRENT_MODEL_ID" ] && [ "$model_alias" = "$CURRENT_MODEL_ALIAS" ]; then
+    marker=" *"
+  fi
+  
+  printf "  [%d] %s%s\n" $((i + 1)) "$display_name" "$marker"
 done
 
 echo ""

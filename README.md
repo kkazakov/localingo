@@ -7,9 +7,10 @@ A self-hosted AI translation service powered by Google's TranslateGemma 12B mult
 ## Features
 
 - Text translation between 55 languages
-- Image translation — upload a photo, screenshot, or document and translate the text within it
+- Image translation — upload a photo, screenshot, or document and translate the text within it (not supported on GGUF models)
 - OpenAI-compatible `/v1/chat/completions` API — drop-in compatible with clients that support custom endpoints
 - Dark-themed single-page web UI with drag-and-drop image support
+- GGUF quantized model support for reduced VRAM requirements
 - Optional API key authentication
 - Self-hosted — all inference runs locally on your GPU; no data leaves your machine
 
@@ -18,7 +19,7 @@ A self-hosted AI translation service powered by Google's TranslateGemma 12B mult
 ## Requirements
 
 - Docker and Docker Compose
-- NVIDIA GPU with at least 16 GB VRAM (the 12B model runs in `bfloat16`)
+- NVIDIA GPU with at least 2 GB VRAM (GGUF quantized models) or 16 GB VRAM (full 12B bfloat16 model)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed on the host
 - A [HuggingFace account](https://huggingface.co) with access granted to the [google/translategemma-12b-it](https://huggingface.co/google/translategemma-12b-it) gated model
 - A HuggingFace API token with read access
@@ -41,14 +42,39 @@ Edit `.env` and set your HuggingFace token:
 HF_TOKEN=hf_your_token_here
 ```
 
-### 2. Start the services
+### 2. Configure storage and model
+
+Edit `.env` and set your HuggingFace token and storage path:
+
+```
+HF_TOKEN=hf_your_token_here
+LOCAL_STORAGE=./models
+```
+
+`LOCAL_STORAGE` specifies where model weights are cached on the host. By default,
+models are stored in `./models` relative to the project directory. You can set this
+to an absolute path like `/storage-models` to use a different volume.
+
+### 3. Select a model (optional)
+
+Use the interactive `select-model.sh` script to choose from available models:
+
+```bash
+./select-model.sh
+```
+
+This script displays GGUF quantized models (for lower VRAM) and full models
+with their VRAM requirements, then updates `.env` with your selection. The default
+model is `google/translategemma-12b-it` (24 GB VRAM).
+
+### 4. Start the services
 
 ```bash
 docker compose up --build -d
 ```
 
 The first run downloads the selected model. Subsequent starts load from the
-local cache at `/storage-models` on the host. The backend takes 1–2 minutes to
+local cache at `LOCAL_STORAGE` on the host. The backend takes 1–2 minutes to
 become ready after the image starts.
 
 ### 3. Open the UI
@@ -131,6 +157,9 @@ curl -s -X POST http://localhost:12434/v1/chat/completions \
 
 Images can also be sent as base64 data URLs: `"url": "data:image/jpeg;base64,<base64data>"`.
 
+**Note:** Image translation is not supported on GGUF quantized models. Use a full
+model like `google/translategemma-12b-it` for image features.
+
 ### Request schema
 
 | Field                        | Type    | Default              | Description                              |
@@ -174,12 +203,13 @@ The response follows the OpenAI chat completion format, with one additional fiel
 
 ## Configuration
 
-All runtime configuration is managed through environment variables in `docker-compose.yaml`.
+All runtime configuration is managed through environment variables in `docker-compose.yaml` and `.env`.
 
 | Variable      | Default                          | Description                                         |
 |---------------|----------------------------------|-----------------------------------------------------|
 | `HF_TOKEN`    | _(from `.env`)_                  | HuggingFace Hub token for downloading the gated model |
-| `MODEL_ID`    | `google/translategemma-12b-it`   | HuggingFace model repository                        |
+| `LOCAL_STORAGE` | `./models`                      | Host path where model weights are cached            |
+| `MODEL_ID`    | `google/translategemma-12b-it`   | HuggingFace model repository or GGUF format (`repo:file.gguf`) |
 | `MODEL_ALIAS` | `translategemma-12b-Q8`          | Model name returned by `/v1/models`                 |
 | `API_KEY`     | `2f8d430a0f17...`                | Bearer token for `/v1/*` endpoints; set to empty string to disable auth |
 | `HF_HOME`     | `/models/hf_cache`               | HuggingFace cache directory inside the container    |
@@ -187,7 +217,11 @@ All runtime configuration is managed through environment variables in `docker-co
 To disable API key authentication, set `API_KEY` to an empty string in `docker-compose.yaml`.
 
 To use a different model, change `MODEL_ID` to any HuggingFace model compatible
-with `AutoModelForImageTextToText`.
+with `AutoModelForImageTextToText`. For GGUF quantized models, use the format
+`repo:filename.gguf` (e.g., `mradermacher/translategemma-4b-it-GGUF:translategemma-4b-it.Q2_K.gguf`).
+
+The `select-model.sh` script provides an interactive interface for selecting from
+available models and quantization levels.
 
 ---
 
@@ -199,12 +233,13 @@ Browser (port 11438)
         ├── GET /          →  serves index.html
         └── /api/*         →  proxied to translate-backend:8080
                                 └── FastAPI (translate-backend, port 8080)
-                                      └── TranslateGemma 12B (GPU, bfloat16)
-                                            └── model cache at /storage-models
+                                      └── TranslateGemma model (GPU)
+                                            └── model cache at $LOCAL_STORAGE
 ```
 
 **Backend** (`backend/server.py`):
 - FastAPI application with a lifespan context manager that loads the model once at startup.
+- Supports both full PyTorch models and GGUF quantized models via `llama-cpp-python`.
 - Accepts the OpenAI message format with a custom `ContentItem` schema that carries
   `source_lang_code` and `target_lang_code` fields alongside the content.
 - Converts the request to HuggingFace's `apply_chat_template` format, runs
@@ -232,8 +267,8 @@ Browser (port 11438)
   additional items in the array are ignored.
 - **Effective image upload limit ~15 MB** — nginx allows 20 MB but base64 encoding
   inflates raw image size by ~33%.
-- **GPU required** — CPU inference is technically possible but impractically slow
-  for a 12B parameter model.
+- **GGUF models do not support images** — use a full model for image translation features.
+- **GPU required** — CPU inference is technically possible but impractically slow.
 - **Model load time** — expect 1–2 minutes from container start before the first
   request can be served.
 
@@ -297,3 +332,4 @@ docker compose up -d translate-backend
 | `ui/Dockerfile`           | nginx:alpine image, copies conf and index.html               |
 | `.env.example`            | Template for the required `.env` file                        |
 | `.env`                    | Local secrets (gitignored — never commit)                    |
+| `select-model.sh`         | Interactive script for selecting and configuring models        |
