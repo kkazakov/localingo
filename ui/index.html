@@ -46,7 +46,7 @@
 </head>
 <body>
 
-<div id="loading-overlay">
+<div id="loading-overlay" class="hidden">
   <div class="loading-box">
     <div class="spinner" id="loading-spinner"></div>
     <h2 id="loading-title">Back-end loading…</h2>
@@ -54,7 +54,7 @@
   </div>
 </div>
 
-<header>
+<header id="main-header" class="hidden">
   <hgroup>
     <h1>Localingo</h1>
     <p>AI-powered translation service</p>
@@ -68,7 +68,7 @@
   </nav>
 </header>
 
-<main>
+<main id="main-content" class="hidden">
   <section>
     <div class="lang-row">
       <div>
@@ -215,7 +215,7 @@
     <article class="panel">
       <div class="panel-header">
         <span class="panel-label">Input</span>
-        <div class="mode-switch">
+        <div class="mode-switch" id="mode-switch">
           <button class="mode-btn" id="mode-text" aria-current="true">Text</button>
           <button class="mode-btn" id="mode-image">Image</button>
         </div>
@@ -246,7 +246,7 @@
   </section>
 </main>
 
-<footer>
+<footer id="main-footer" class="hidden">
   <small>
     <span class="status-dot" id="status-dot"></span>
     <span id="status-text">Connecting…</span>
@@ -272,6 +272,7 @@
   const timing      = document.getElementById('timing');
   const modeText    = document.getElementById('mode-text');
   const modeImage   = document.getElementById('mode-image');
+  const modeSwitch  = document.getElementById('mode-switch');
   const dropZone    = document.getElementById('drop-zone');
   const fileInput   = document.getElementById('file-input');
   const imgPreview  = document.getElementById('img-preview');
@@ -284,11 +285,15 @@
   const loadingSpinner  = document.getElementById('loading-spinner');
   const loadingTitle    = document.getElementById('loading-title');
   const loadingMsg      = document.getElementById('loading-msg');
+  const mainHeader      = document.getElementById('main-header');
+  const mainContent     = document.getElementById('main-content');
+  const mainFooter      = document.getElementById('main-footer');
 
   let mode = 'text';
   let imageDataUrl = null;
   let loadedModel = null;
   let imageSupported = true;
+  let everReady = false;
 
   const themeSwitcher = {
     _scheme: 'auto',
@@ -357,16 +362,32 @@
         fetch('/api/v1/models', { headers: { Authorization: `Bearer ${API_KEY}` } }),
         fetch('/api/health'),
       ]);
+      if (!modelsRes.ok || !healthRes.ok) {
+        statusDot.className = 'status-dot error';
+        statusText.textContent = 'Cannot reach backend';
+        modelNameDisplay.textContent = 'Error';
+        if (everReady) {
+          loadingTitle.textContent = 'Back-end unreachable';
+          loadingMsg.textContent = 'Cannot connect to the server. Please retry in a minute.';
+          loadingSpinner.style.display = 'none';
+        }
+        loadingOverlay.classList.remove('hidden');
+        return;
+      }
       const modelsData = await modelsRes.json();
       const healthData = await healthRes.json();
       const model = modelsData.data?.[0];
       if (model) {
+        everReady = true;
         MODEL = model.id;
         loadedModel = model.id;
         modelNameDisplay.textContent = model.id;
         statusDot.className = 'status-dot ok';
         statusText.textContent = 'Model ready';
         loadingOverlay.classList.add('hidden');
+        mainHeader.classList.remove('hidden');
+        mainContent.classList.remove('hidden');
+        mainFooter.classList.remove('hidden');
       } else {
         statusDot.className = 'status-dot';
         statusText.textContent = 'Model not loaded yet';
@@ -375,17 +396,22 @@
         loadingMsg.textContent = 'Please retry in a minute.';
         loadingSpinner.style.display = '';
         loadingOverlay.classList.remove('hidden');
+        mainHeader.classList.add('hidden');
+        mainContent.classList.add('hidden');
+        mainFooter.classList.add('hidden');
       }
       imageSupported = healthData.model_type !== 'gguf';
-      modeImage.classList.toggle('hidden', !imageSupported);
+      modeSwitch.classList.toggle('hidden', !imageSupported);
       if (!imageSupported && mode === 'image') setMode('text');
     } catch {
       statusDot.className = 'status-dot error';
       statusText.textContent = 'Cannot reach backend';
       modelNameDisplay.textContent = 'Error';
-      loadingTitle.textContent = 'Back-end unreachable';
-      loadingMsg.textContent = 'Cannot connect to the server. Please retry in a minute.';
-      loadingSpinner.style.display = 'none';
+      if (everReady) {
+        loadingTitle.textContent = 'Back-end unreachable';
+        loadingMsg.textContent = 'Cannot connect to the server. Please retry in a minute.';
+        loadingSpinner.style.display = 'none';
+      }
       loadingOverlay.classList.remove('hidden');
     }
   }
