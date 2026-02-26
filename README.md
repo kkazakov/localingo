@@ -4,10 +4,22 @@ A self-hosted AI translation service powered by Google's TranslateGemma 12B mult
 
 ---
 
+## Screenshots
+
+**Text translation** — English to Ukrainian:
+
+![Text translation](screenshots/screen-1.png)
+
+**Image translation** — Bulgarian to Portuguese (photo of a product label):
+
+![Image translation](screenshots/screen-2.png)
+
+---
+
 ## Features
 
 - Text translation between 55 languages
-- Image translation — upload a photo, screenshot, or document and translate the text within it (not supported on GGUF models)
+- Image translation — upload a photo, screenshot, or document and translate the text within it; source language is auto-detected by the model and the `source_lang_code` field is ignored (not supported on GGUF models)
 - OpenAI-compatible `/v1/chat/completions` API — drop-in compatible with clients that support custom endpoints
 - Dark-themed single-page web UI with drag-and-drop image support
 - GGUF quantized model support for reduced VRAM requirements
@@ -157,6 +169,9 @@ curl -s -X POST http://localhost:12434/v1/chat/completions \
 
 Images can also be sent as base64 data URLs: `"url": "data:image/jpeg;base64,<base64data>"`.
 
+**Note:** For image requests, `source_lang_code` is ignored — the model auto-detects
+the source language from the image content. Only `target_lang_code` is used.
+
 **Note:** Image translation is not supported on GGUF quantized models. Use a full
 model like `google/translategemma-12b-it` for image features.
 
@@ -165,7 +180,7 @@ model like `google/translategemma-12b-it` for image features.
 | Field                        | Type    | Default              | Description                              |
 |------------------------------|---------|----------------------|------------------------------------------|
 | `messages[].content[].type`  | string  | required             | `"text"` or `"image"`                    |
-| `messages[].content[].source_lang_code` | string | required  | BCP-47 language code of the source       |
+| `messages[].content[].source_lang_code` | string | required  | BCP-47 language code of the source; ignored for `type=image` (auto-detected) |
 | `messages[].content[].target_lang_code` | string | required  | BCP-47 language code of the target       |
 | `messages[].content[].text`  | string  | —                    | Source text (required when type=`text`)  |
 | `messages[].content[].url`   | string  | —                    | Image URL or data URL (type=`image`)     |

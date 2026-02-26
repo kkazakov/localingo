@@ -36,9 +36,23 @@
       textarea, .drop-zone, .output-text { min-height: 200px; }
     }
     .hidden { display: none !important; }
+    #loading-overlay { position: fixed; inset: 0; background: var(--background-color); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    #loading-overlay.hidden { display: none !important; }
+    .loading-box { text-align: center; max-width: 360px; padding: 2rem; }
+    .loading-box p { color: var(--muted-color); margin-top: 0.5rem; }
+    .spinner { width: 2.5rem; height: 2.5rem; border: 3px solid var(--muted-border-color); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.9s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+
+<div id="loading-overlay">
+  <div class="loading-box">
+    <div class="spinner" id="loading-spinner"></div>
+    <h2 id="loading-title">Back-end loading…</h2>
+    <p id="loading-msg">Please retry in a minute.</p>
+  </div>
+</div>
 
 <header>
   <hgroup>
@@ -266,9 +280,15 @@
   const statusText  = document.getElementById('status-text');
   const modelNameDisplay = document.getElementById('model-name');
 
+  const loadingOverlay  = document.getElementById('loading-overlay');
+  const loadingSpinner  = document.getElementById('loading-spinner');
+  const loadingTitle    = document.getElementById('loading-title');
+  const loadingMsg      = document.getElementById('loading-msg');
+
   let mode = 'text';
   let imageDataUrl = null;
   let loadedModel = null;
+  let imageSupported = true;
 
   const themeSwitcher = {
     _scheme: 'auto',
@@ -333,26 +353,40 @@
 
   async function checkStatus() {
     try {
-      const r = await fetch('/api/v1/models', {
-        headers: { Authorization: `Bearer ${API_KEY}` }
-      });
-      const data = await r.json();
-      const model = data.data?.[0];
+      const [modelsRes, healthRes] = await Promise.all([
+        fetch('/api/v1/models', { headers: { Authorization: `Bearer ${API_KEY}` } }),
+        fetch('/api/health'),
+      ]);
+      const modelsData = await modelsRes.json();
+      const healthData = await healthRes.json();
+      const model = modelsData.data?.[0];
       if (model) {
         MODEL = model.id;
         loadedModel = model.id;
         modelNameDisplay.textContent = model.id;
         statusDot.className = 'status-dot ok';
         statusText.textContent = 'Model ready';
+        loadingOverlay.classList.add('hidden');
       } else {
         statusDot.className = 'status-dot';
         statusText.textContent = 'Model not loaded yet';
         modelNameDisplay.textContent = 'No model';
+        loadingTitle.textContent = 'Back-end loading…';
+        loadingMsg.textContent = 'Please retry in a minute.';
+        loadingSpinner.style.display = '';
+        loadingOverlay.classList.remove('hidden');
       }
+      imageSupported = healthData.model_type !== 'gguf';
+      modeImage.classList.toggle('hidden', !imageSupported);
+      if (!imageSupported && mode === 'image') setMode('text');
     } catch {
       statusDot.className = 'status-dot error';
       statusText.textContent = 'Cannot reach backend';
       modelNameDisplay.textContent = 'Error';
+      loadingTitle.textContent = 'Back-end unreachable';
+      loadingMsg.textContent = 'Cannot connect to the server. Please retry in a minute.';
+      loadingSpinner.style.display = 'none';
+      loadingOverlay.classList.remove('hidden');
     }
   }
 
