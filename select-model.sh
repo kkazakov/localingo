@@ -5,20 +5,48 @@ declare -A MODEL_MAP
 declare -a MODEL_LIST
 
 add_model() {
-  local model_id="$1"
+  local model_repo="$1"
   local model_alias="$2"
   local vram_req="$3"
+  local quant_file="${4:-}"
+  
+  local model_id="$model_repo"
+  if [ -n "$quant_file" ]; then
+    model_id="$model_repo:$quant_file"
+  fi
+  
   local display_name="$model_alias ($vram_req)"
   MODEL_MAP["$display_name"]="$model_id|$model_alias"
   MODEL_LIST+=("$display_name")
 }
 
-add_model "google/translategemma-12b-it" "translategemma-12b-Q8" "24 GB VRAM"
-add_model "google/translategemma-12b-it" "translategemma-12b-Q4" "12 GB VRAM"
-add_model "google/translategemma-12b-it" "translategemma-12b-Q2" "7 GB VRAM"
-add_model "google/translategemma-27b-it" "translategemma-27b-Q8" "54 GB VRAM"
-add_model "google/translategemma-27b-it" "translategemma-27b-Q4" "28 GB VRAM"
-add_model "google/translategemma-27b-it" "translategemma-27b-Q2" "16 GB VRAM"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q2_K" "2.5 GB VRAM" "translategemma-4b-it.Q2_K.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-IQ4_XS" "3 GB VRAM" "translategemma-4b-it.IQ4_XS.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q3_K_S" "3 GB VRAM" "translategemma-4b-it.Q3_K_S.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q3_K_M" "3 GB VRAM" "translategemma-4b-it.Q3_K_M.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q3_K_L" "3.5 GB VRAM" "translategemma-4b-it.Q3_K_L.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q4_K_S" "4 GB VRAM" "translategemma-4b-it.Q4_K_S.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q4_K_M" "4 GB VRAM" "translategemma-4b-it.Q4_K_M.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q5_K_S" "5 GB VRAM" "translategemma-4b-it.Q5_K_S.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q5_K_M" "5 GB VRAM" "translategemma-4b-it.Q5_K_M.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q6_K" "6 GB VRAM" "translategemma-4b-it.Q6_K.gguf"
+add_model "mradermacher/translategemma-4b-it-GGUF" "translategemma-4b-it-Q8_0" "8 GB VRAM" "translategemma-4b-it.Q8_0.gguf"
+add_model "bullerwins/translategemma-12b-it-GGUF" "translategemma-12b-it-Q3_K_L" "8 GB VRAM" "translategemma-12b-it-Q3_K_L.gguf"
+add_model "bullerwins/translategemma-12b-it-GGUF" "translategemma-12b-it-Q4_K_S" "9 GB VRAM" "translategemma-12b-it-Q4_K_S.gguf"
+add_model "bullerwins/translategemma-12b-it-GGUF" "translategemma-12b-it-Q4_K_M" "10 GB VRAM" "translategemma-12b-it-Q4_K_M.gguf"
+add_model "bullerwins/translategemma-12b-it-GGUF" "translategemma-12b-it-Q5_K_S" "11 GB VRAM" "translategemma-12b-it-Q5_K_S.gguf"
+add_model "bullerwins/translategemma-12b-it-GGUF" "translategemma-12b-it-Q5_K_M" "12 GB VRAM" "translategemma-12b-it-Q5_K_M.gguf"
+add_model "bullerwins/translategemma-12b-it-GGUF" "translategemma-12b-it-Q6_K" "14 GB VRAM" "translategemma-12b-it-Q6_K.gguf"
+add_model "bullerwins/translategemma-12b-it-GGUF" "translategemma-12b-it-Q8_0" "18 GB VRAM" "translategemma-12b-it-Q8_0.gguf"
+add_model "bullerwins/translategemma-27b-it-GGUF" "translategemma-27b-it-Q3_K_L" "18 GB VRAM" "translategemma-27b-it-Q3_K_L.gguf"
+add_model "bullerwins/translategemma-27b-it-GGUF" "translategemma-27b-it-Q4_K_S" "20 GB VRAM" "translategemma-27b-it-Q4_K_S.gguf"
+add_model "bullerwins/translategemma-27b-it-GGUF" "translategemma-27b-it-Q4_K_M" "22 GB VRAM" "translategemma-27b-it-Q4_K_M.gguf"
+add_model "bullerwins/translategemma-27b-it-GGUF" "translategemma-27b-it-Q5_K_S" "24 GB VRAM" "translategemma-27b-it-Q5_K_S.gguf"
+add_model "bullerwins/translategemma-27b-it-GGUF" "translategemma-27b-it-Q5_K_M" "26 GB VRAM" "translategemma-27b-it-Q5_K_M.gguf"
+add_model "bullerwins/translategemma-27b-it-GGUF" "translategemma-27b-it-Q6_K" "30 GB VRAM" "translategemma-27b-it-Q6_K.gguf"
+add_model "bullerwins/translategemma-27b-it-GGUF" "translategemma-27b-it-Q8_0" "38 GB VRAM" "translategemma-27b-it-Q8_0.gguf"
+add_model "google/translategemma-12b-it" "translategemma-12b-it" "24 GB VRAM"
+add_model "google/translategemma-27b-it" "translategemma-27b-it" "54 GB VRAM"
 
 ENV_FILE=".env"
 

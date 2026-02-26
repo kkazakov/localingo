@@ -30,8 +30,8 @@ A self-hosted AI translation service powered by Google's TranslateGemma 12B mult
 ### 1. Clone and configure
 
 ```bash
-git clone <repo-url>
-cd translate
+git clone https://github.com/kkazakov/localingo
+cd localingo
 cp .env.example .env
 ```
 
@@ -47,7 +47,7 @@ HF_TOKEN=hf_your_token_here
 docker compose up --build -d
 ```
 
-The first run downloads the 12B model (~24 GB). Subsequent starts load from the
+The first run downloads the selected model. Subsequent starts load from the
 local cache at `/storage-models` on the host. The backend takes 1–2 minutes to
 become ready after the image starts.
 
