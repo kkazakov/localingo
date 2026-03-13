@@ -20,7 +20,9 @@ A self-hosted AI translation service powered by Google's TranslateGemma 12B mult
 
 - Text translation between 55 languages
 - Image translation — upload a photo, screenshot, or document and translate the text within it; source language is auto-detected by the model and the `source_lang_code` field is ignored (not supported on GGUF models)
+- **Voice input** — click the microphone button to record speech; faster-whisper (large-v3) transcribes the audio, auto-detects the language, prefills the input, and triggers translation immediately
 - OpenAI-compatible `/v1/chat/completions` API — drop-in compatible with clients that support custom endpoints
+- OpenAI-compatible `/v1/audio/transcriptions` API — speech-to-text endpoint powered by faster-whisper
 - Dark-themed single-page web UI with drag-and-drop image support
 - GGUF quantized model support for reduced VRAM requirements
 - Optional API key authentication
@@ -31,7 +33,7 @@ A self-hosted AI translation service powered by Google's TranslateGemma 12B mult
 ## Requirements
 
 - Docker and Docker Compose
-- NVIDIA GPU with at least 2 GB VRAM (GGUF quantized models) or 16 GB VRAM (full 12B bfloat16 model)
+- NVIDIA GPU with at least 2 GB VRAM (GGUF quantized models) or 16 GB VRAM (full 12B bfloat16 model); an additional ~3 GB VRAM is used by the Whisper large-v3 model for voice input
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed on the host
 - A [HuggingFace account](https://huggingface.co) with access granted to the [google/translategemma-12b-it](https://huggingface.co/google/translategemma-12b-it) gated model
 - A HuggingFace API token with read access
@@ -148,6 +150,26 @@ curl -s -X POST http://localhost:12434/v1/chat/completions \
   }' | python3 -m json.tool
 ```
 
+### Transcribe audio (voice input)
+
+```bash
+curl -s -X POST http://localhost:12434/v1/audio/transcriptions \
+  -H "Authorization: Bearer 2f8d430a0f17b3eaa957cf7ae188a3db71a2df6d30cf0a9766eddbb0b70421c8" \
+  -F "file=@recording.webm"
+```
+
+Response:
+
+```json
+{
+  "text": "Hello, world!",
+  "language": "en",
+  "language_probability": 0.99
+}
+```
+
+Accepts any audio format supported by faster-whisper (webm, wav, ogg, mp4, etc.). The detected language code matches the BCP-47 codes used by the translation endpoints.
+
 ### Translate an image (via URL)
 
 ```bash
@@ -248,23 +270,28 @@ Browser (port 11438)
         ├── GET /          →  serves index.html
         └── /api/*         →  proxied to translate-backend:8080
                                 └── FastAPI (translate-backend, port 8080)
-                                      └── TranslateGemma model (GPU)
+                                      ├── TranslateGemma model (GPU) — translation
+                                      └── Whisper large-v3 model (GPU) — voice transcription
                                             └── model cache at $LOCAL_STORAGE
 ```
 
 **Backend** (`backend/server.py`):
-- FastAPI application with a lifespan context manager that loads the model once at startup.
+- FastAPI application with a lifespan context manager that loads both the translation model and the Whisper model once at startup.
 - Supports both full PyTorch models and GGUF quantized models via `llama-cpp-python`.
 - Accepts the OpenAI message format with a custom `ContentItem` schema that carries
   `source_lang_code` and `target_lang_code` fields alongside the content.
 - Converts the request to HuggingFace's `apply_chat_template` format, runs
   greedy decoding under `torch.inference_mode()`, and decodes only the newly
   generated tokens.
+- The `/v1/audio/transcriptions` endpoint accepts a multipart audio file upload,
+  transcribes it with faster-whisper (large-v3, int8, CUDA), and returns the
+  detected text, language code, and language probability.
 
 **Frontend** (`ui/index.html`):
 - Single self-contained file — no build step, no npm, no framework.
 - Polls `/api/v1/models` every 15 seconds to reflect model readiness in the UI.
 - Supports text input, file upload (click or drag-and-drop), and clipboard paste for images.
+- Microphone button (left of the Text mode button): click once to start recording, click again to stop and submit. The button shows a pulsing red stop icon while recording and a spinner while the transcription request is in flight. On completion, the detected text prefills the input, the source language is set to the detected language (swapping source and target if the detected language matches the current target), and translation starts automatically.
 - Language swap button swaps both selectors and the current text content simultaneously.
 - `Ctrl+Enter` / `Cmd+Enter` triggers translation.
 
@@ -285,7 +312,8 @@ Browser (port 11438)
 - **GGUF models do not support images** — use a full model for image translation features.
 - **GPU required** — CPU inference is technically possible but impractically slow.
 - **Model load time** — expect 1–2 minutes from container start before the first
-  request can be served.
+  request can be served. Both the translation model and Whisper load sequentially during startup.
+- **Voice input requires microphone permission** — the browser will prompt for permission on first use; HTTPS is required in production (localhost is exempt).
 
 ---
 
@@ -339,10 +367,10 @@ docker compose up -d translate-backend
 | File                      | Purpose                                                      |
 |---------------------------|--------------------------------------------------------------|
 | `docker-compose.yaml`     | Service definitions, environment variables, GPU allocation   |
-| `backend/server.py`       | FastAPI app — models, helpers, endpoints (~215 lines)        |
+| `backend/server.py`       | FastAPI app — models, helpers, endpoints (~370 lines)        |
 | `backend/Dockerfile`      | PyTorch 2.7 / CUDA 12.6 image, installs requirements        |
 | `backend/requirements.txt`| Python dependencies                                          |
-| `ui/index.html`           | Complete web UI — HTML, CSS, JS (~865 lines)                 |
+| `ui/index.html`           | Complete web UI — HTML, CSS, JS (~720 lines)                 |
 | `ui/nginx.conf`           | nginx config — static serving and API proxy                  |
 | `ui/Dockerfile`           | nginx:alpine image, copies conf and index.html               |
 | `.env.example`            | Template for the required `.env` file                        |
