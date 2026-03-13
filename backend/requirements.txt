@@ -6,3 +6,5 @@ accelerate
 pillow
 httpx
 llama-cpp-python
+faster-whisper
+python-multipart

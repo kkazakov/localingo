@@ -35,6 +35,14 @@
       .panels { grid-template-columns: 1fr; }
       textarea, .drop-zone, .output-text { min-height: 200px; }
     }
+    .mic-btn { line-height: 0; padding: 0.3rem 0.5rem; }
+    .mic-btn .stop-icon { display: none; }
+    .mic-btn.recording { background: var(--del-color) !important; color: #fff !important; animation: mic-pulse 0.8s ease-in-out infinite alternate; }
+    .mic-btn.recording .mic-icon { display: none; }
+    .mic-btn.recording .stop-icon { display: inline; }
+    .mic-btn.error-flash { background: var(--del-color) !important; color: #fff !important; }
+    .mic-btn[aria-busy="true"] { pointer-events: none; opacity: 0.6; }
+    @keyframes mic-pulse { from { opacity: 1; } to { opacity: 0.55; } }
     .hidden { display: none !important; }
     #loading-overlay { position: fixed; inset: 0; background: var(--background-color); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     #loading-overlay.hidden { display: none !important; }
@@ -216,6 +224,10 @@
       <div class="panel-header">
         <span class="panel-label">Input</span>
         <div class="mode-switch" id="mode-switch">
+          <button class="mode-btn mic-btn" id="mic-btn" title="Click to record" aria-label="Click to record audio">
+            <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+            <svg class="stop-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          </button>
           <button class="mode-btn" id="mode-text" aria-current="true">Text</button>
           <button class="mode-btn" id="mode-image">Image</button>
         </div>
@@ -280,6 +292,7 @@
   const statusDot   = document.getElementById('status-dot');
   const statusText  = document.getElementById('status-text');
   const modelNameDisplay = document.getElementById('model-name');
+  const micBtn      = document.getElementById('mic-btn');
 
   const loadingOverlay  = document.getElementById('loading-overlay');
   const loadingSpinner  = document.getElementById('loading-spinner');
@@ -605,6 +618,101 @@
     outputText.className = 'output-text placeholder';
     outputText.textContent = 'Translation will appear here…';
   }
+
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let micStream = null;
+
+  async function startRecording() {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      flashMicError();
+      return;
+    }
+    audioChunks = [];
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : '';
+    mediaRecorder = mimeType ? new MediaRecorder(micStream, { mimeType }) : new MediaRecorder(micStream);
+    mediaRecorder.addEventListener('dataavailable', e => { if (e.data.size > 0) audioChunks.push(e.data); });
+    mediaRecorder.addEventListener('stop', onRecordingStop);
+    mediaRecorder.start();
+    micBtn.classList.add('recording');
+  }
+
+  function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+    mediaRecorder.stop();
+    micStream.getTracks().forEach(t => t.stop());
+    micBtn.classList.remove('recording');
+  }
+
+  async function onRecordingStop() {
+    if (!audioChunks.length) return;
+    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+    const ext = mimeType.includes('ogg') ? '.ogg' : mimeType.includes('mp4') ? '.mp4' : '.webm';
+    const blob = new Blob(audioChunks, { type: mimeType });
+    audioChunks = [];
+    micBtn.setAttribute('aria-busy', 'true');
+    try {
+      const fd = new FormData();
+      fd.append('file', blob, `recording${ext}`);
+      const resp = await fetch('/api/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${API_KEY}` },
+        body: fd,
+      });
+      if (!resp.ok) {
+        const msg = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${msg}`);
+      }
+      const data = await resp.json();
+      applyTranscription(data);
+    } catch {
+      flashMicError();
+    } finally {
+      micBtn.removeAttribute('aria-busy');
+    }
+  }
+
+  function applyTranscription(data) {
+    const { text, language } = data;
+    if (text) {
+      if (mode !== 'text') setMode('text');
+      inputText.value = text;
+      inputText.dispatchEvent(new Event('input'));
+    }
+    if (language) {
+      const hasLang = !!srcLang.querySelector(`option[value="${language}"]`);
+      if (hasLang) {
+        if (language === tgtLang.value) {
+          const prevSrc = srcLang.value;
+          srcLang.value = tgtLang.value;
+          tgtLang.value = prevSrc;
+        } else {
+          srcLang.value = language;
+        }
+        saveLanguages();
+      }
+    }
+    if (text) doTranslate();
+  }
+
+  function flashMicError() {
+    micBtn.classList.add('error-flash');
+    setTimeout(() => micBtn.classList.remove('error-flash'), 1200);
+  }
+
+  micBtn.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  });
 
   themeSwitcher.init();
   loadLanguages();
